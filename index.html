@@ -744,19 +744,34 @@
   let wheelHourVal = 7, wheelMinVal = 0;
 
   function buildWheel(el, count, onChange) {
-    el.innerHTML = Array.from({ length: count }, (_, i) =>
-      `<div class="wheel-item" data-v="${i}">${String(i).padStart(2, "0")}</div>`
-    ).join("");
+    const total = count * 3;
+    el.innerHTML = Array.from({ length: total }, (_, idx) => {
+      const v = idx % count;
+      return `<div class="wheel-item" data-idx="${idx}" data-v="${v}">${String(v).padStart(2, "0")}</div>`;
+    }).join("");
     const items = el.querySelectorAll(".wheel-item");
+    let recenterTimer = null, jumping = false;
     function syncSel() {
-      const idx = Math.min(count - 1, Math.max(0, Math.round(el.scrollTop / 40)));
+      const idx = Math.min(total - 1, Math.max(0, Math.round(el.scrollTop / 40)));
+      const val = idx % count;
       items.forEach((it, k) => it.classList.toggle("sel", k === idx));
-      onChange(idx);
+      onChange(val);
+      if (jumping) return;
+      clearTimeout(recenterTimer);
+      recenterTimer = setTimeout(() => {
+        if (idx < count || idx >= count * 2) {
+          jumping = true;
+          const midIdx = count + val;
+          el.scrollTop = midIdx * 40;
+          items.forEach((it, k) => it.classList.toggle("sel", k === midIdx));
+          requestAnimationFrame(() => { jumping = false; });
+        }
+      }, 90);
     }
     el.addEventListener("scroll", syncSel, { passive: true });
     items.forEach(it => it.addEventListener("click", () => {
-      const v = parseInt(it.dataset.v, 10);
-      el.scrollTo({ top: v * 40, behavior: "smooth" });
+      const idx = parseInt(it.dataset.idx, 10);
+      el.scrollTo({ top: idx * 40, behavior: "smooth" });
     }));
   }
   function initWheels() {
@@ -769,10 +784,11 @@
   function setWheelPos(h, m) {
     const wh = document.getElementById("wheelHour"), wm = document.getElementById("wheelMin");
     if (!wh || !wm) return;
-    wh.scrollTop = h * 40; wm.scrollTop = m * 40;
+    const hIdx = 24 + h, mIdx = 60 + m;
+    wh.scrollTop = hIdx * 40; wm.scrollTop = mIdx * 40;
     wheelHourVal = h; wheelMinVal = m;
-    wh.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === h));
-    wm.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === m));
+    wh.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === hIdx));
+    wm.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === mIdx));
   }
   function renderRepeatPicker() {
     const box = document.getElementById("dayPills");
