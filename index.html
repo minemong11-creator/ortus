@@ -206,6 +206,18 @@
     width: 100%; padding: 11px 0; border: none; border-bottom: 1px solid var(--rule);
     background: transparent; font-size: 15px; color: var(--ink); outline: none;
   }
+  .time-keypad {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .time-num {
+    width: 54px; border: none; background: transparent; text-align: center;
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; color: var(--ink); outline: none;
+    padding: 2px 0; border-radius: 8px;
+  }
+  .time-num:focus { background: rgba(20,20,19,0.05); }
+  .time-colon { font-size: 24px; font-weight: 700; color: var(--muted); line-height: 1; }
   .photo-box {
     margin-top: 8px; border: 1px dashed #b9b6ac; border-radius: 12px; padding: 12px;
     text-align: center; cursor: pointer; display: block; font-size: 12.5px; color: var(--ink);
@@ -338,7 +350,17 @@
           <button class="text-btn" id="addCloseBtn" onclick="closeSheet('addSheet')"></button>
         </div>
         <label class="s-label" id="lblTime"></label>
-        <input class="s-input" id="inTime" type="time" value="07:00" />
+        <div class="time-keypad">
+          <input class="time-num" id="inHour" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="07" aria-label="Hour"
+            onfocus="this.select()"
+            oninput="this.value=this.value.replace(/\D/g,'').slice(0,2); if(this.value.length===2){ if(parseInt(this.value,10)>23) this.value='23'; const m=document.getElementById('inMin'); m.focus(); m.select(); }"
+            onblur="let v=parseInt(this.value||'0',10); if(isNaN(v)) v=0; this.value=String(Math.min(23,Math.max(0,v))).padStart(2,'0');" />
+          <span class="time-colon">:</span>
+          <input class="time-num" id="inMin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="Minute"
+            onfocus="this.select()"
+            oninput="this.value=this.value.replace(/\D/g,'').slice(0,2); if(this.value.length===2 && parseInt(this.value,10)>59) this.value='59';"
+            onblur="let v=parseInt(this.value||'0',10); if(isNaN(v)) v=0; this.value=String(Math.min(59,Math.max(0,v))).padStart(2,'0');" />
+        </div>
         <label class="s-label" id="lblPlace"></label>
         <input class="s-input" id="inPlace" type="text" value="" />
         <label class="s-label" id="lblRef"></label>
@@ -695,7 +717,12 @@
     opt.value = label; opt.textContent = label; sel.appendChild(opt); sel.value = label;
   }
   function saveAlarm() {
-    const t = document.getElementById("inTime").value || "07:00", p = document.getElementById("inPlace").value.trim();
+    let hh = parseInt(document.getElementById("inHour").value || "7", 10);
+    let mm = parseInt(document.getElementById("inMin").value || "0", 10);
+    if (isNaN(hh)) hh = 7; if (isNaN(mm)) mm = 0;
+    hh = Math.min(23, Math.max(0, hh)); mm = Math.min(59, Math.max(0, mm));
+    const t = String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+    const p = document.getElementById("inPlace").value.trim();
     if (!p) { alert(T[lang].alertPlace); return; }
     const s = document.getElementById("inSound").value;
     alarms.unshift({ id: Date.now(), time: t, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
