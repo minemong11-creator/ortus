@@ -495,8 +495,8 @@
       addTitle: "새 알람 & 장소 등록", close: "닫기",
       lblTime: "알람 시간",
       tzPromptMsg: (fromTz, toTz) => `시차가 다른 지역으로 이동했습니다 (${fromTz} → ${toTz}).\n알람 시간대를 새 현지 시간대로 변경할까요?`,
-      lblPlace: "인증 장소 이름",
-      placePh: "인증 장소를 직접 입력하세요 (예: 화장실 세면대, 현관문)",
+      lblPlace: "인증 장소 이름 (선택)",
+      placePh: "비워 둬도 돼요 (예: 화장실 세면대)",
       lblRef: "기준 사진 등록", refBox: "+ 카메라로 기준 장소 사진 찍기 (등록)",
       lblSound: "알람 소리",
       default: "기본 알람음",
@@ -530,8 +530,8 @@
       addTitle: "New Alarm & Place", close: "Close",
       lblTime: "TIME",
       tzPromptMsg: (fromTz, toTz) => `Timezone change detected (${fromTz} → ${toTz}).\nSwitch your alarms to the new local timezone?`,
-      lblPlace: "VERIFICATION PLACE",
-      placePh: "Enter place name (e.g. Bathroom Sink, Front Door)",
+      lblPlace: "VERIFICATION PLACE (OPTIONAL)",
+      placePh: "Optional (e.g. Bathroom Sink)",
       lblRef: "REFERENCE PHOTO", refBox: "+ Capture Reference Photo (Camera)",
       lblSound: "ALERT SOUND",
       default: "Default Alarm Sound",
@@ -568,7 +568,7 @@
   let mediaStream = null, audioCtx = null, sirenTimer = null, customAudioEl = null;
   const customSounds = {};
 
-  function getPlace(a) { return a.customPlace || (lang === "ko" ? a.placeKo : a.placeEn); }
+  function getPlace(a) { return a.customPlace || (lang === "ko" ? "지정 장소" : "Target Spot"); }
   function getSoundLabel(key) { return customSounds[key] ? key : (T[lang][key] || key); }
 
   function applyLang() {
@@ -895,7 +895,6 @@
     if (!selectedDate && selectedDays.length === 0) { alert(T[lang].alertPickDay); return; }
     const t = String(wheelHourVal).padStart(2, "0") + ":" + String(wheelMinVal).padStart(2, "0");
     const p = document.getElementById("inPlace").value.trim();
-    if (!p) { alert(T[lang].alertPlace); return; }
     const s = document.getElementById("inSound").value;
     alarms.unshift({
       id: Date.now(), time: t,
