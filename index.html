@@ -339,15 +339,6 @@
         </div>
         <label class="s-label" id="lblTime"></label>
         <input class="s-input" id="inTime" type="time" value="07:00" />
-        <label class="s-label" id="lblTzMode"></label>
-        <select class="s-input" id="inTzMode">
-          <option value="auto"></option>
-          <option value="Asia/Seoul">Asia/Seoul (KST, UTC+9)</option>
-          <option value="America/New_York">America/New_York (EST/EDT)</option>
-          <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
-          <option value="Europe/London">Europe/London (GMT/BST)</option>
-          <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
-        </select>
         <label class="s-label" id="lblPlace"></label>
         <input class="s-input" id="inPlace" type="text" value="" />
         <label class="s-label" id="lblRef"></label>
@@ -420,7 +411,7 @@
       camHint: "아래 버튼을 누르면 폰 카메라가 켜집니다.<br/>등록한 장소와 맞춰 찍어주세요.",
       openCam: "카메라 열어서 끄기", shootFrame: "촬영 후 인증하기", takeNative: "카메라로 인증 사진 찍기",
       addTitle: "새 알람 & 장소 등록", close: "닫기",
-      lblTime: "알람 시간", lblTzMode: "시간대 기준", tzAutoOpt: "📍 현재 GPS 위치 시간대 자동", tzGpsTag: "GPS 현지",
+      lblTime: "알람 시간",
       tzPromptMsg: (fromTz, toTz) => `시차가 다른 지역으로 이동했습니다 (${fromTz} → ${toTz}).\n알람 시간대를 새 현지 시간대로 변경할까요?`,
       lblPlace: "인증 장소 이름",
       placePh: "인증 장소를 직접 입력하세요 (예: 화장실 세면대, 현관문)",
@@ -453,7 +444,7 @@
       camHint: "Tap below to open your camera.<br/>Align with your registered place.",
       openCam: "Open Camera to Stop", shootFrame: "Shoot & Verify Frame", takeNative: "Take Verification Photo (Camera)",
       addTitle: "New Alarm & Place", close: "Close",
-      lblTime: "TIME", lblTzMode: "TIMEZONE", tzAutoOpt: "📍 Auto (Current GPS Local Time)", tzGpsTag: "GPS Local",
+      lblTime: "TIME",
       tzPromptMsg: (fromTz, toTz) => `Timezone change detected (${fromTz} → ${toTz}).\nSwitch your alarms to the new local timezone?`,
       lblPlace: "VERIFICATION PLACE",
       placePh: "Enter place name (e.g. Bathroom Sink, Front Door)",
@@ -517,8 +508,6 @@
     document.getElementById("addCloseBtn").textContent = t.close;
     document.getElementById("proCloseBtn").textContent = t.close;
     document.getElementById("lblTime").textContent = t.lblTime;
-    document.getElementById("lblTzMode").textContent = t.lblTzMode;
-    document.getElementById("inTzMode").options[0].textContent = t.tzAutoOpt;
     updateTzBar();
     document.getElementById("lblPlace").textContent = t.lblPlace;
     document.getElementById("inPlace").placeholder = t.placePh;
@@ -674,8 +663,6 @@
           <div class="alarm-meta">
             <span>${t[a.daysKey]}</span>
             <span class="dot active-dot"></span>
-            <span>${a.tzMode === 'auto' ? `${t.tzGpsTag} (${activeTz.split('/').pop().replace(/_/g,' ')})` : a.tzMode.split('/').pop().replace(/_/g,' ')}</span>
-            <span class="dot active-dot"></span>
             <span style="text-decoration:underline;text-underline-offset:3px;cursor:pointer;" onclick="editPlace(${a.id}, event)">${getPlace(a)}</span>
             <span class="ref-badge">${a.refPhoto ? t.photoSet : t.noPhoto}</span>
             <button class="text-btn" style="font-size:11px;padding:0 4px;" onclick="deleteAlarm(${a.id}, event)">${t.del}</button>
@@ -711,8 +698,7 @@
     const t = document.getElementById("inTime").value || "07:00", p = document.getElementById("inPlace").value.trim();
     if (!p) { alert(T[lang].alertPlace); return; }
     const s = document.getElementById("inSound").value;
-    const tzMode = document.getElementById("inTzMode").value || "auto";
-    alarms.unshift({ id: Date.now(), time: t, tzMode, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
+    alarms.unshift({ id: Date.now(), time: t, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
     saveAlarms();
     pendingRefPhoto = null; document.getElementById("inPlace").value = ""; document.getElementById("refPreview").style.display = "none";
     closeSheet("addSheet"); renderAlarms();
@@ -927,10 +913,9 @@
     const now = new Date();
     updateTzBar();
     if (document.getElementById("ringOverlay").classList.contains("show")) return;
+    const cur = formatTimeInTz(now, activeTz);
     for (const a of alarms) {
-      const targetTz = (a.tzMode && a.tzMode !== "auto") ? a.tzMode : activeTz;
-      const cur = formatTimeInTz(now, targetTz);
-      const key = `${a.id}_${targetTz}_${cur}`;
+      const key = `${a.id}_${activeTz}_${cur}`;
       if (a.on && a.time === cur && lastFiredKey !== key) { lastFiredKey = key; triggerSpecific(a.id); break; }
     }
   }, 1000);
