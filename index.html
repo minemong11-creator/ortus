@@ -206,18 +206,64 @@
     width: 100%; padding: 11px 0; border: none; border-bottom: 1px solid var(--rule);
     background: transparent; font-size: 15px; color: var(--ink); outline: none;
   }
-  .time-keypad {
-    display: flex; align-items: center; gap: 8px; padding: 6px 0 8px;
-    border-bottom: 1px solid var(--rule);
+  .wheel-wrap {
+    position: relative; display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 120px; margin: 4px 0 6px; border-bottom: 1px solid var(--rule);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 28%, black 72%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, black 28%, black 72%, transparent);
   }
-  .time-num {
-    width: 54px; border: none; background: transparent; text-align: center;
-    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums; color: var(--ink); outline: none;
-    padding: 2px 0; border-radius: 8px;
+  .wheel-band {
+    position: absolute; left: 0; right: 0; top: 40px; height: 40px;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    pointer-events: none;
   }
-  .time-num:focus { background: rgba(20,20,19,0.05); }
-  .time-colon { font-size: 24px; font-weight: 700; color: var(--muted); line-height: 1; }
+  .wheel-col {
+    width: 68px; height: 120px; overflow-y: auto; scroll-snap-type: y mandatory;
+    padding: 40px 0; scrollbar-width: none; -ms-overflow-style: none;
+    overscroll-behavior: contain;
+  }
+  .wheel-col::-webkit-scrollbar { display: none; }
+  .wheel-item {
+    height: 40px; display: flex; align-items: center; justify-content: center;
+    scroll-snap-align: center; font-size: 23px; font-weight: 500;
+    font-variant-numeric: tabular-nums; color: var(--muted); cursor: pointer;
+    user-select: none; transition: color 0.12s, transform 0.12s;
+  }
+  .wheel-item.sel { color: var(--ink); font-weight: 700; font-size: 27px; }
+  .wheel-colon { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1; padding-bottom: 2px; }
+  .repeat-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 6px 0 10px; border-bottom: 1px solid var(--rule);
+  }
+  .day-pills { display: flex; align-items: center; gap: 5px; flex: 1; }
+  .day-pill {
+    flex: 1; height: 32px; border: 1px solid var(--rule); border-radius: 8px;
+    background: transparent; color: var(--muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.14s;
+  }
+  .day-pill.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .day-pill.dim { opacity: 0.35; }
+  .cal-wrap { position: relative; flex-shrink: 0; }
+  .cal-btn {
+    width: 34px; height: 32px; border: 1px solid var(--rule); border-radius: 8px;
+    background: transparent; color: var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .cal-native {
+    position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+  }
+  .date-chip {
+    display: none; align-items: center; justify-content: space-between;
+    margin-top: 8px; padding: 7px 10px; border-radius: 8px;
+    background: rgba(20,20,19,0.05); font-size: 12px; font-weight: 600;
+  }
+  .date-chip.show { display: flex; }
+  .date-chip button {
+    border: none; background: transparent; color: var(--muted); font-size: 14px;
+    cursor: pointer; padding: 0 4px; line-height: 1;
+  }
   .photo-box {
     margin-top: 8px; border: 1px dashed #b9b6ac; border-radius: 12px; padding: 12px;
     text-align: center; cursor: pointer; display: block; font-size: 12.5px; color: var(--ink);
@@ -350,16 +396,30 @@
           <button class="text-btn" id="addCloseBtn" onclick="closeSheet('addSheet')"></button>
         </div>
         <label class="s-label" id="lblTime"></label>
-        <div class="time-keypad">
-          <input class="time-num" id="inHour" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="07" aria-label="Hour"
-            onfocus="this.select()"
-            oninput="this.value=this.value.replace(/\D/g,'').slice(0,2); if(this.value.length===2){ if(parseInt(this.value,10)>23) this.value='23'; const m=document.getElementById('inMin'); m.focus(); m.select(); }"
-            onblur="let v=parseInt(this.value||'0',10); if(isNaN(v)) v=0; this.value=String(Math.min(23,Math.max(0,v))).padStart(2,'0');" />
-          <span class="time-colon">:</span>
-          <input class="time-num" id="inMin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="00" aria-label="Minute"
-            onfocus="this.select()"
-            oninput="this.value=this.value.replace(/\D/g,'').slice(0,2); if(this.value.length===2 && parseInt(this.value,10)>59) this.value='59';"
-            onblur="let v=parseInt(this.value||'0',10); if(isNaN(v)) v=0; this.value=String(Math.min(59,Math.max(0,v))).padStart(2,'0');" />
+        <div class="wheel-wrap">
+          <div class="wheel-band"></div>
+          <div class="wheel-col" id="wheelHour" aria-label="Hour"></div>
+          <span class="wheel-colon">:</span>
+          <div class="wheel-col" id="wheelMin" aria-label="Minute"></div>
+        </div>
+        <label class="s-label" id="lblRepeat"></label>
+        <div class="repeat-row">
+          <div class="day-pills" id="dayPills"></div>
+          <div class="cal-wrap">
+            <button type="button" class="cal-btn" id="calPickBtn" aria-label="Select Date">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </button>
+            <input class="cal-native" id="inSpecificDate" type="date" onchange="onDatePicked()" />
+          </div>
+        </div>
+        <div class="date-chip" id="pickedDateChip">
+          <span id="pickedDateText"></span>
+          <button type="button" onclick="clearSpecificDate()" aria-label="Clear Date">×</button>
         </div>
         <label class="s-label" id="lblPlace"></label>
         <input class="s-input" id="inPlace" type="text" value="" />
@@ -448,7 +508,9 @@
       promptPlace: "인증 장소를 직접 입력해 주세요:", alertPlace: "인증 장소를 직접 입력해 주세요!",
       alertNoRef: "기준 사진이 등록되지 않은 알람입니다. 먼저 + 버튼으로 기준 사진을 찍어 등록해 주세요!",
       alertMismatch: (sim, pl) => `일치도 ${sim}% — 등록한 장소(${pl})와 다릅니다! 같은 구도로 다시 찍어주세요.`,
-      daysMonFri: "월 – 금", daysSatSun: "토 – 일", daysEvery: "매일"
+      daysMonFri: "월 – 금", daysSatSun: "토 – 일", daysEvery: "매일",
+      lblRepeat: "반복 요일 · 날짜", dayShort: ["일","월","화","수","목","금","토"],
+      alertPickDay: "요일을 최소 1개 선택하거나 달력에서 날짜를 지정해 주세요."
     },
     en: {
       langBtn: "KR",
@@ -481,7 +543,9 @@
       promptPlace: "Edit verification place name:", alertPlace: "Please enter a verification place!",
       alertNoRef: "No reference photo set. Please tap + to register a photo first!",
       alertMismatch: (sim, pl) => `Match ${sim}% — Does not match ${pl}. Please shoot from the same angle.`,
-      daysMonFri: "Mon – Fri", daysSatSun: "Sat – Sun", daysEvery: "Every day"
+      daysMonFri: "Mon – Fri", daysSatSun: "Sat – Sun", daysEvery: "Every day",
+      lblRepeat: "REPEAT · DATE", dayShort: ["S","M","T","W","T","F","S"],
+      alertPickDay: "Please select at least one day or pick a date."
     }
   };
 
@@ -527,6 +591,8 @@
     document.getElementById("camHint").innerHTML = t.camHint;
     document.getElementById("nativeCamLabel").textContent = t.takeNative;
     document.getElementById("addTitle").textContent = t.addTitle;
+    document.getElementById("lblRepeat").textContent = t.lblRepeat;
+    renderRepeatPicker();
     document.getElementById("addCloseBtn").textContent = t.close;
     document.getElementById("proCloseBtn").textContent = t.close;
     document.getElementById("lblTime").textContent = t.lblTime;
@@ -672,6 +738,99 @@
     document.getElementById("appShell").classList.remove("show");
   }
 
+  let selectedDays = [0, 1, 2, 3, 4, 5, 6];
+  let selectedDate = "";
+  let wheelsReady = false;
+  let wheelHourVal = 7, wheelMinVal = 0;
+
+  function buildWheel(el, count, onChange) {
+    el.innerHTML = Array.from({ length: count }, (_, i) =>
+      `<div class="wheel-item" data-v="${i}">${String(i).padStart(2, "0")}</div>`
+    ).join("");
+    const items = el.querySelectorAll(".wheel-item");
+    function syncSel() {
+      const idx = Math.min(count - 1, Math.max(0, Math.round(el.scrollTop / 40)));
+      items.forEach((it, k) => it.classList.toggle("sel", k === idx));
+      onChange(idx);
+    }
+    el.addEventListener("scroll", syncSel, { passive: true });
+    items.forEach(it => it.addEventListener("click", () => {
+      const v = parseInt(it.dataset.v, 10);
+      el.scrollTo({ top: v * 40, behavior: "smooth" });
+    }));
+  }
+  function initWheels() {
+    if (wheelsReady) return;
+    wheelsReady = true;
+    buildWheel(document.getElementById("wheelHour"), 24, v => { wheelHourVal = v; });
+    buildWheel(document.getElementById("wheelMin"), 60, v => { wheelMinVal = v; });
+    setWheelPos(7, 0);
+  }
+  function setWheelPos(h, m) {
+    const wh = document.getElementById("wheelHour"), wm = document.getElementById("wheelMin");
+    if (!wh || !wm) return;
+    wh.scrollTop = h * 40; wm.scrollTop = m * 40;
+    wheelHourVal = h; wheelMinVal = m;
+    wh.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === h));
+    wm.querySelectorAll(".wheel-item").forEach((it, k) => it.classList.toggle("sel", k === m));
+  }
+  function renderRepeatPicker() {
+    const box = document.getElementById("dayPills");
+    if (!box) return;
+    const names = T[lang].dayShort;
+    box.innerHTML = names.map((nm, d) => {
+      const on = !selectedDate && selectedDays.includes(d);
+      const dim = !!selectedDate;
+      return `<button type="button" class="day-pill ${on ? "on" : ""} ${dim ? "dim" : ""}" onclick="toggleDay(${d})">${nm}</button>`;
+    }).join("");
+    const calBtn = document.getElementById("calPickBtn");
+    const chip = document.getElementById("pickedDateChip");
+    const txt = document.getElementById("pickedDateText");
+    if (calBtn) calBtn.classList.toggle("on", !!selectedDate);
+    if (chip && txt) {
+      chip.classList.toggle("show", !!selectedDate);
+      txt.textContent = selectedDate ? formatDateLabel(selectedDate) : "";
+    }
+  }
+  function toggleDay(d) {
+    selectedDate = "";
+    const di = document.getElementById("inSpecificDate");
+    if (di) di.value = "";
+    if (selectedDays.includes(d)) selectedDays = selectedDays.filter(x => x !== d);
+    else selectedDays = [...selectedDays, d].sort((a, b) => a - b);
+    renderRepeatPicker();
+  }
+  function onDatePicked() {
+    const v = document.getElementById("inSpecificDate").value;
+    selectedDate = v || "";
+    renderRepeatPicker();
+  }
+  function clearSpecificDate() {
+    selectedDate = "";
+    const di = document.getElementById("inSpecificDate");
+    if (di) di.value = "";
+    if (selectedDays.length === 0) selectedDays = [0, 1, 2, 3, 4, 5, 6];
+    renderRepeatPicker();
+  }
+  function formatDateLabel(ymd) {
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const w = T[lang].dayShort[dt.getDay()];
+    return `${y}.${String(m).padStart(2, "0")}.${String(d).padStart(2, "0")} (${w})`;
+  }
+  function formatAlarmRepeat(a) {
+    const t = T[lang];
+    if (a.specificDate) return formatDateLabel(a.specificDate);
+    if (Array.isArray(a.days) && a.days.length > 0) {
+      if (a.days.length === 7) return t.daysEvery;
+      const s = a.days.join(",");
+      if (s === "1,2,3,4,5") return t.daysMonFri;
+      if (s === "0,6") return t.daysSatSun;
+      return a.days.map(d => t.dayShort[d]).join(" · ");
+    }
+    return t[a.daysKey || "daysEvery"];
+  }
+
   function renderAlarms() {
     const t = T[lang];
     if (alarms.length === 0) {
@@ -683,7 +842,7 @@
         <div class="alarm-left" >
           <div class="alarm-time">${a.time}</div>
           <div class="alarm-meta">
-            <span>${t[a.daysKey]}</span>
+            <span>${formatAlarmRepeat(a)}</span>
             <span class="dot active-dot"></span>
             <span style="text-decoration:underline;text-underline-offset:3px;cursor:pointer;" onclick="editPlace(${a.id}, event)">${getPlace(a)}</span>
             <span class="ref-badge">${a.refPhoto ? t.photoSet : t.noPhoto}</span>
@@ -717,17 +876,22 @@
     opt.value = label; opt.textContent = label; sel.appendChild(opt); sel.value = label;
   }
   function saveAlarm() {
-    let hh = parseInt(document.getElementById("inHour").value || "7", 10);
-    let mm = parseInt(document.getElementById("inMin").value || "0", 10);
-    if (isNaN(hh)) hh = 7; if (isNaN(mm)) mm = 0;
-    hh = Math.min(23, Math.max(0, hh)); mm = Math.min(59, Math.max(0, mm));
-    const t = String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+    if (!selectedDate && selectedDays.length === 0) { alert(T[lang].alertPickDay); return; }
+    const t = String(wheelHourVal).padStart(2, "0") + ":" + String(wheelMinVal).padStart(2, "0");
     const p = document.getElementById("inPlace").value.trim();
     if (!p) { alert(T[lang].alertPlace); return; }
     const s = document.getElementById("inSound").value;
-    alarms.unshift({ id: Date.now(), time: t, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
+    alarms.unshift({
+      id: Date.now(), time: t,
+      days: selectedDate ? null : [...selectedDays],
+      specificDate: selectedDate || null,
+      daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto
+    });
     saveAlarms();
     pendingRefPhoto = null; document.getElementById("inPlace").value = ""; document.getElementById("refPreview").style.display = "none";
+    selectedDate = ""; const di = document.getElementById("inSpecificDate"); if (di) di.value = "";
+    selectedDays = [0, 1, 2, 3, 4, 5, 6];
+    renderRepeatPicker();
     closeSheet("addSheet"); renderAlarms();
   }
 
@@ -863,7 +1027,13 @@
     }));
   }
 
-  function openSheet(id) { document.getElementById(id).classList.add("show"); }
+  function openSheet(id) {
+    document.getElementById(id).classList.add("show");
+    if (id === "addSheet") {
+      initWheels();
+      renderRepeatPicker();
+    }
+  }
   function closeSheet(id) { document.getElementById(id).classList.remove("show"); }
 
   let activeTz = localStorage.getItem("ortus_gps_tz") || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
@@ -935,6 +1105,27 @@
     }, () => {}, { enableHighAccuracy: false, timeout: 8000 });
   }
 
+  function getDateInTz(date, tz) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+      const y = parts.find(p => p.type === "year").value;
+      const m = parts.find(p => p.type === "month").value;
+      const d = parts.find(p => p.type === "day").value;
+      return `${y}-${m}-${d}`;
+    } catch { return ""; }
+  }
+  function getWeekdayInTz(date, tz) {
+    try {
+      const w = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(date);
+      return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(w);
+    } catch { return date.getDay(); }
+  }
+  function doesAlarmMatchToday(a, now, tz) {
+    if (a.specificDate) return getDateInTz(now, tz) === a.specificDate;
+    if (Array.isArray(a.days) && a.days.length > 0) return a.days.includes(getWeekdayInTz(now, tz));
+    return true;
+  }
+
   let lastFiredKey = "";
   setInterval(() => {
     const now = new Date();
@@ -943,7 +1134,7 @@
     const cur = formatTimeInTz(now, activeTz);
     for (const a of alarms) {
       const key = `${a.id}_${activeTz}_${cur}`;
-      if (a.on && a.time === cur && lastFiredKey !== key) { lastFiredKey = key; triggerSpecific(a.id); break; }
+      if (a.on && a.time === cur && doesAlarmMatchToday(a, now, activeTz) && lastFiredKey !== key) { lastFiredKey = key; triggerSpecific(a.id); break; }
     }
   }, 1000);
 
