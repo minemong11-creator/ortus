@@ -289,6 +289,11 @@
       </div>
     </div>
 
+    <div id="tzBar" style="display:flex;justify-content:space-between;align-items:center;padding:10px 24px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;">
+      <span id="tzStatusText"></span>
+      <button class="text-btn" id="gpsSyncBtn" type="button" onclick="syncGpsTimezone()" style="font-size:11px;color:var(--accent);text-decoration:underline;text-underline-offset:3px;"></button>
+    </div>
+
     <div class="main" id="alarmList"></div>
 
 
@@ -335,6 +340,15 @@
         </div>
         <label class="s-label" id="lblTime"></label>
         <input class="s-input" id="inTime" type="time" value="07:00" />
+        <label class="s-label" id="lblTzMode"></label>
+        <select class="s-input" id="inTzMode">
+          <option value="auto"></option>
+          <option value="Asia/Seoul">Asia/Seoul (KST, UTC+9)</option>
+          <option value="America/New_York">America/New_York (EST/EDT)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+          <option value="Europe/London">Europe/London (GMT/BST)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
+        </select>
         <label class="s-label" id="lblPlace"></label>
         <input class="s-input" id="inPlace" type="text" value="" />
         <label class="s-label" id="lblRef"></label>
@@ -408,7 +422,8 @@
       camHint: "아래 버튼을 누르면 폰 카메라가 켜집니다.<br/>등록한 장소와 맞춰 찍어주세요.",
       openCam: "카메라 열어서 끄기", shootFrame: "촬영 후 인증하기", takeNative: "카메라로 인증 사진 찍기",
       addTitle: "새 알람 & 장소 등록", close: "닫기",
-      lblTime: "알람 시간", lblPlace: "인증 장소 이름",
+      lblTime: "알람 시간", lblTzMode: "시간대 기준", tzAutoOpt: "📍 현재 GPS 위치 시간대 자동", tzGpsTag: "GPS 현지", gpsSync: "GPS 시간대 동기화", gpsSyncing: "위치 확인 중…", gpsDone: "GPS 동기화됨", gpsFallback: "기기 시간대 사용",
+      lblPlace: "인증 장소 이름",
       placePh: "인증 장소를 직접 입력하세요 (예: 화장실 세면대, 현관문)",
       lblRef: "기준 사진 등록", refBox: "+ 카메라로 기준 장소 사진 찍기 (등록)",
       lblSound: "알람 소리",
@@ -440,7 +455,8 @@
       camHint: "Tap below to open your camera.<br/>Align with your registered place.",
       openCam: "Open Camera to Stop", shootFrame: "Shoot & Verify Frame", takeNative: "Take Verification Photo (Camera)",
       addTitle: "New Alarm & Place", close: "Close",
-      lblTime: "TIME", lblPlace: "VERIFICATION PLACE",
+      lblTime: "TIME", lblTzMode: "TIMEZONE", tzAutoOpt: "📍 Auto (Current GPS Local Time)", tzGpsTag: "GPS Local", gpsSync: "Sync GPS Timezone", gpsSyncing: "Locating…", gpsDone: "GPS Synced", gpsFallback: "Using Device TZ",
+      lblPlace: "VERIFICATION PLACE",
       placePh: "Enter place name (e.g. Bathroom Sink, Front Door)",
       lblRef: "REFERENCE PHOTO", refBox: "+ Capture Reference Photo (Camera)",
       lblSound: "ALERT SOUND",
@@ -490,6 +506,10 @@
     document.getElementById("addCloseBtn").textContent = t.close;
     document.getElementById("proCloseBtn").textContent = t.close;
     document.getElementById("lblTime").textContent = t.lblTime;
+    document.getElementById("lblTzMode").textContent = t.lblTzMode;
+    document.getElementById("inTzMode").options[0].textContent = t.tzAutoOpt;
+    document.getElementById("gpsSyncBtn").textContent = t.gpsSync;
+    updateTzBar();
     document.getElementById("lblPlace").textContent = t.lblPlace;
     document.getElementById("inPlace").placeholder = t.placePh;
     document.getElementById("lblRef").textContent = t.lblRef;
@@ -656,6 +676,8 @@
           <div class="alarm-meta">
             <span>${t[a.daysKey]}</span>
             <span class="dot active-dot"></span>
+            <span>${a.tzMode === 'auto' ? `${t.tzGpsTag} (${activeTz.split('/').pop().replace(/_/g,' ')})` : a.tzMode.split('/').pop().replace(/_/g,' ')}</span>
+            <span class="dot active-dot"></span>
             <span style="text-decoration:underline;text-underline-offset:3px;cursor:pointer;" onclick="editPlace(${a.id}, event)">${getPlace(a)}</span>
             <span class="ref-badge">${a.refPhoto ? t.photoSet : t.noPhoto}</span>
             <button class="text-btn" style="font-size:11px;padding:0 4px;" onclick="deleteAlarm(${a.id}, event)">${t.del}</button>
@@ -691,7 +713,8 @@
     const t = document.getElementById("inTime").value || "07:00", p = document.getElementById("inPlace").value.trim();
     if (!p) { alert(T[lang].alertPlace); return; }
     const s = document.getElementById("inSound").value;
-    alarms.unshift({ id: Date.now(), time: t, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
+    const tzMode = document.getElementById("inTzMode").value || "auto";
+    alarms.unshift({ id: Date.now(), time: t, tzMode, daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto });
     pendingRefPhoto = null; document.getElementById("inPlace").value = ""; document.getElementById("refPreview").style.display = "none";
     closeSheet("addSheet"); renderAlarms();
   }
@@ -831,13 +854,63 @@
   function openSheet(id) { document.getElementById(id).classList.add("show"); }
   function closeSheet(id) { document.getElementById(id).classList.remove("show"); }
 
+  let activeTz = localStorage.getItem("ortus_gps_tz") || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul";
+  let tzSource = localStorage.getItem("ortus_gps_tz") ? "GPS" : "SYS";
+
+  function formatTimeInTz(date, tz) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
+      const h = parts.find(p => p.type === "hour")?.value || "00";
+      const m = parts.find(p => p.type === "minute")?.value || "00";
+      return `${h === "24" ? "00" : h}:${m}`;
+    } catch {
+      return `${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
+    }
+  }
+
+  function updateTzBar() {
+    const nowStr = formatTimeInTz(new Date(), activeTz);
+    const shortTz = activeTz.replace(/_/g, " ");
+    const el = document.getElementById("tzStatusText");
+    if (el) el.textContent = `${tzSource} · ${shortTz} · ${nowStr}`;
+  }
+
+  function syncGpsTimezone() {
+    const btn = document.getElementById("gpsSyncBtn");
+    if (!navigator.geolocation) { alert(T[lang].gpsFallback); return; }
+    btn.textContent = T[lang].gpsSyncing;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const res = await fetch(`https://timeapi.io/api/TimeZone/coordinate?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}`);
+        const data = await res.json();
+        if (data && data.timeZone) {
+          activeTz = data.timeZone;
+          tzSource = "GPS";
+          localStorage.setItem("ortus_gps_tz", activeTz);
+        }
+      } catch {
+        activeTz = Intl.DateTimeFormat().resolvedOptions().timeZone || activeTz;
+        tzSource = "SYS";
+      }
+      btn.textContent = T[lang].gpsDone;
+      updateTzBar();
+      renderAlarms();
+      setTimeout(() => { btn.textContent = T[lang].gpsSync; }, 2000);
+    }, () => {
+      btn.textContent = T[lang].gpsFallback;
+      setTimeout(() => { btn.textContent = T[lang].gpsSync; }, 2000);
+    }, { enableHighAccuracy: false, timeout: 8000 });
+  }
+
   let lastFiredKey = "";
   setInterval(() => {
     const now = new Date();
-    const cur = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    updateTzBar();
     if (document.getElementById("ringOverlay").classList.contains("show")) return;
     for (const a of alarms) {
-      const key = `${a.id}_${cur}`;
+      const targetTz = (a.tzMode && a.tzMode !== "auto") ? a.tzMode : activeTz;
+      const cur = formatTimeInTz(now, targetTz);
+      const key = `${a.id}_${targetTz}_${cur}`;
       if (a.on && a.time === cur && lastFiredKey !== key) { lastFiredKey = key; triggerSpecific(a.id); break; }
     }
   }, 1000);
