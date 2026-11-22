@@ -291,7 +291,6 @@
 
     <div id="tzBar" style="display:flex;justify-content:space-between;align-items:center;padding:10px 24px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;">
       <span id="tzStatusText"></span>
-      <span id="tzAutoBadge" style="font-size:11px;color:var(--muted);">AUTO GPS</span>
     </div>
 
     <div class="main" id="alarmList"></div>
@@ -422,7 +421,7 @@
       camHint: "아래 버튼을 누르면 폰 카메라가 켜집니다.<br/>등록한 장소와 맞춰 찍어주세요.",
       openCam: "카메라 열어서 끄기", shootFrame: "촬영 후 인증하기", takeNative: "카메라로 인증 사진 찍기",
       addTitle: "새 알람 & 장소 등록", close: "닫기",
-      lblTime: "알람 시간", lblTzMode: "시간대 기준", tzAutoOpt: "📍 현재 GPS 위치 시간대 자동", tzGpsTag: "GPS 현지", tzAutoBadge: "GPS 자동",
+      lblTime: "알람 시간", lblTzMode: "시간대 기준", tzAutoOpt: "📍 현재 GPS 위치 시간대 자동", tzGpsTag: "GPS 현지",
       tzPromptMsg: (fromTz, toTz) => `시차가 다른 지역으로 이동했습니다 (${fromTz} → ${toTz}).\n알람 시간대를 새 현지 시간대로 변경할까요?`,
       lblPlace: "인증 장소 이름",
       placePh: "인증 장소를 직접 입력하세요 (예: 화장실 세면대, 현관문)",
@@ -456,7 +455,7 @@
       camHint: "Tap below to open your camera.<br/>Align with your registered place.",
       openCam: "Open Camera to Stop", shootFrame: "Shoot & Verify Frame", takeNative: "Take Verification Photo (Camera)",
       addTitle: "New Alarm & Place", close: "Close",
-      lblTime: "TIME", lblTzMode: "TIMEZONE", tzAutoOpt: "📍 Auto (Current GPS Local Time)", tzGpsTag: "GPS Local", tzAutoBadge: "AUTO GPS",
+      lblTime: "TIME", lblTzMode: "TIMEZONE", tzAutoOpt: "📍 Auto (Current GPS Local Time)", tzGpsTag: "GPS Local",
       tzPromptMsg: (fromTz, toTz) => `Timezone change detected (${fromTz} → ${toTz}).\nSwitch your alarms to the new local timezone?`,
       lblPlace: "VERIFICATION PLACE",
       placePh: "Enter place name (e.g. Bathroom Sink, Front Door)",
@@ -510,7 +509,6 @@
     document.getElementById("lblTime").textContent = t.lblTime;
     document.getElementById("lblTzMode").textContent = t.lblTzMode;
     document.getElementById("inTzMode").options[0].textContent = t.tzAutoOpt;
-    document.getElementById("tzAutoBadge").textContent = t.tzAutoBadge;
     updateTzBar();
     document.getElementById("lblPlace").textContent = t.lblPlace;
     document.getElementById("inPlace").placeholder = t.placePh;
