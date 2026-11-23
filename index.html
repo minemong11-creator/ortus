@@ -182,6 +182,16 @@
     cursor: pointer; text-align: center; display: block;
   }
 
+  .mode-seg {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px;
+  }
+  .mode-btn {
+    padding: 10px 8px; border: 1px solid var(--rule); border-radius: 10px;
+    background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .mode-btn.active {
+    background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600;
+  }
   /* SLIDE-UP BOTTOM SHEETS */
   .sheet-bg {
     position: absolute; inset: 0; background: rgba(20,20,19,0);
@@ -421,12 +431,19 @@
           <span id="pickedDateText"></span>
           <button type="button" onclick="clearSpecificDate()" aria-label="Clear Date">×</button>
         </div>
-        <label class="s-label" id="lblPlace"></label>
-        <input class="s-input" id="inPlace" type="text" value="" />
-        <label class="s-label" id="lblRef"></label>
-        <label class="photo-box" id="refBox" for="refFileInput"></label>
-        <input class="hidden-file" id="refFileInput" type="file" accept="image/*" capture="environment" onchange="onRefPhoto(event)" />
-        <img id="refPreview" class="photo-preview" />
+        <label class="s-label" id="lblMode"></label>
+        <div class="mode-seg">
+          <button type="button" class="mode-btn active" id="modePhotoBtn" onclick="setAlarmMode('photo')"></button>
+          <button type="button" class="mode-btn" id="modeNormalBtn" onclick="setAlarmMode('normal')"></button>
+        </div>
+        <div id="photoConfigWrap">
+          <label class="s-label" id="lblPlace"></label>
+          <input class="s-input" id="inPlace" type="text" value="" />
+          <label class="s-label" id="lblRef"></label>
+          <label class="photo-box" id="refBox" for="refFileInput"></label>
+          <input class="hidden-file" id="refFileInput" type="file" accept="image/*" capture="environment" onchange="onRefPhoto(event)" />
+          <img id="refPreview" class="photo-preview" />
+        </div>
         <label class="s-label" id="lblSound"></label>
         <select class="s-input" id="inSound">
           <option value="default"></option>
@@ -510,7 +527,10 @@
       alertMismatch: (sim, pl) => `일치도 ${sim}% — 등록한 장소(${pl})와 다릅니다! 같은 구도로 다시 찍어주세요.`,
       daysMonFri: "월 – 금", daysSatSun: "토 – 일", daysEvery: "매일",
       lblRepeat: "반복 요일 · 날짜", dayShort: ["일","월","화","수","목","금","토"],
-      alertPickDay: "요일을 최소 1개 선택하거나 달력에서 날짜를 지정해 주세요."
+      alertPickDay: "요일을 최소 1개 선택하거나 달력에서 날짜를 지정해 주세요.",
+      lblMode: "알람 방식", modePhoto: "장소 사진 인증", modeNormal: "일반 알람",
+      normalPlace: "일반 알람", normalBadge: "일반", stopNormal: "알람 끄기",
+      normalRule: s => `소리: ${s} · 터치로 바로 끄기`
     },
     en: {
       langBtn: "KR",
@@ -545,7 +565,10 @@
       alertMismatch: (sim, pl) => `Match ${sim}% — Does not match ${pl}. Please shoot from the same angle.`,
       daysMonFri: "Mon – Fri", daysSatSun: "Sat – Sun", daysEvery: "Every day",
       lblRepeat: "REPEAT · DATE", dayShort: ["S","M","T","W","T","F","S"],
-      alertPickDay: "Please select at least one day or pick a date."
+      alertPickDay: "Please select at least one day or pick a date.",
+      lblMode: "ALARM MODE", modePhoto: "Photo Verify", modeNormal: "Standard",
+      normalPlace: "Standard Alarm", normalBadge: "STANDARD", stopNormal: "Dismiss Alarm",
+      normalRule: s => `Sound: ${s} · Tap to dismiss`
     }
   };
 
@@ -568,7 +591,18 @@
   let mediaStream = null, audioCtx = null, sirenTimer = null, customAudioEl = null;
   const customSounds = {};
 
-  function getPlace(a) { return a.customPlace || (lang === "ko" ? "지정 장소" : "Target Spot"); }
+  let selectedMode = "photo";
+  function setAlarmMode(mode) {
+    selectedMode = mode;
+    document.getElementById("modePhotoBtn").classList.toggle("active", mode === "photo");
+    document.getElementById("modeNormalBtn").classList.toggle("active", mode === "normal");
+    document.getElementById("photoConfigWrap").style.display = mode === "photo" ? "block" : "none";
+  }
+
+  function getPlace(a) {
+    if (a.mode === "normal") return T[lang].normalPlace;
+    return a.customPlace || (lang === "ko" ? "지정 장소" : "Target Spot");
+  }
   function getSoundLabel(key) { return customSounds[key] ? key : (T[lang][key] || key); }
 
   function applyLang() {
@@ -593,6 +627,9 @@
     document.getElementById("addTitle").textContent = t.addTitle;
     document.getElementById("lblRepeat").textContent = t.lblRepeat;
     renderRepeatPicker();
+    document.getElementById("lblMode").textContent = t.lblMode;
+    document.getElementById("modePhotoBtn").textContent = t.modePhoto;
+    document.getElementById("modeNormalBtn").textContent = t.modeNormal;
     document.getElementById("addCloseBtn").textContent = t.close;
     document.getElementById("proCloseBtn").textContent = t.close;
     document.getElementById("lblTime").textContent = t.lblTime;
@@ -860,8 +897,9 @@
           <div class="alarm-meta">
             <span>${formatAlarmRepeat(a)}</span>
             <span class="dot active-dot"></span>
-            <span style="text-decoration:underline;text-underline-offset:3px;cursor:pointer;" onclick="editPlace(${a.id}, event)">${getPlace(a)}</span>
-            <span class="ref-badge">${a.refPhoto ? t.photoSet : t.noPhoto}</span>
+            ${a.mode === "normal"
+              ? `<span>${t.normalPlace}</span><span class="ref-badge">${t.normalBadge}</span>`
+              : `<span style="text-decoration:underline;text-underline-offset:3px;cursor:pointer;" onclick="editPlace(${a.id}, event)">${getPlace(a)}</span><span class="ref-badge">${a.refPhoto ? t.photoSet : t.noPhoto}</span>`}
             <button class="text-btn" style="font-size:11px;padding:0 4px;" onclick="deleteAlarm(${a.id}, event)">${t.del}</button>
           </div>
         </div>
@@ -897,15 +935,17 @@
     const p = document.getElementById("inPlace").value.trim();
     const s = document.getElementById("inSound").value;
     alarms.unshift({
-      id: Date.now(), time: t,
+      id: Date.now(), time: t, mode: selectedMode,
       days: selectedDate ? null : [...selectedDays],
       specificDate: selectedDate || null,
-      daysKey: "daysEvery", customPlace: p, soundKey: s, on: true, refPhoto: pendingRefPhoto
+      daysKey: "daysEvery", customPlace: selectedMode === "normal" ? "" : p, soundKey: s, on: true,
+      refPhoto: selectedMode === "normal" ? null : pendingRefPhoto
     });
     saveAlarms();
     pendingRefPhoto = null; document.getElementById("inPlace").value = ""; document.getElementById("refPreview").style.display = "none";
     selectedDate = ""; const di = document.getElementById("inSpecificDate"); if (di) di.value = "";
     selectedDays = [0, 1, 2, 3, 4, 5, 6];
+    setAlarmMode("photo");
     renderRepeatPicker();
     closeSheet("addSheet"); renderAlarms();
   }
@@ -952,24 +992,30 @@
   function triggerSpecific(id) {
     const t = T[lang]; currentAlarm = alarms.find(x => x.id === id) || alarms[0]; if (!currentAlarm) return;
     camOpen = false;
+    const isNormal = currentAlarm.mode === "normal";
     document.getElementById("ringClock").textContent = currentAlarm.time;
-    document.getElementById("ringTarget").textContent = t.targetPrefix + getPlace(currentAlarm);
-    document.getElementById("ringRule").textContent = t.ruleFmt(getSoundLabel(currentAlarm.soundKey));
+    document.getElementById("ringTarget").textContent = isNormal ? t.normalPlace : (t.targetPrefix + getPlace(currentAlarm));
+    document.getElementById("ringRule").textContent = isNormal ? t.normalRule(getSoundLabel(currentAlarm.soundKey)) : t.ruleFmt(getSoundLabel(currentAlarm.soundKey));
     document.getElementById("ringInfo").style.display = "block";
     document.getElementById("camView").classList.remove("show");
     document.getElementById("mainActionBtn").style.display = "block";
-    document.getElementById("mainActionBtn").textContent = t.openCam;
+    document.getElementById("mainActionBtn").textContent = isNormal ? t.stopNormal : t.openCam;
     document.getElementById("nativeCamLabel").style.display = "none";
     document.getElementById("liveShotImg").style.display = "none";
     document.getElementById("liveVideo").style.display = "none";
     document.getElementById("matchScoreText").textContent = "";
     const ghost = document.getElementById("ghostImg");
-    if (currentAlarm.refPhoto) { ghost.src = currentAlarm.refPhoto; ghost.style.display = "block"; } else { ghost.style.display = "none"; }
+    if (!isNormal && currentAlarm.refPhoto) { ghost.src = currentAlarm.refPhoto; ghost.style.display = "block"; } else { ghost.style.display = "none"; }
     document.getElementById("ringOverlay").classList.add("show");
     startSiren(currentAlarm.soundKey);
   }
 
   async function handleVerifyStep() {
+    if (currentAlarm && currentAlarm.mode === "normal") {
+      stopSiren();
+      document.getElementById("ringOverlay").classList.remove("show");
+      return;
+    }
     const btn = document.getElementById("mainActionBtn");
     if (!camOpen) {
       camOpen = true; document.getElementById("ringInfo").style.display = "none"; document.getElementById("camView").classList.add("show");
