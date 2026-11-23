@@ -192,6 +192,24 @@
   .mode-btn.active {
     background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600;
   }
+  .slide-track {
+    position: relative; width: 100%; height: 58px; border-radius: 999px;
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; user-select: none; touch-action: none;
+  }
+  .slide-label {
+    font-size: 13px; font-weight: 500; letter-spacing: 0.02em;
+    color: rgba(255,255,255,0.72); pointer-events: none; transition: opacity 0.15s;
+  }
+  .slide-knob {
+    position: absolute; left: 4px; top: 4px; width: 48px; height: 48px;
+    border-radius: 50%; background: #ffffff; color: #141413;
+    display: flex; align-items: center; justify-content: center;
+    cursor: grab; box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .slide-knob.dragging { cursor: grabbing; transition: none; }
   /* SLIDE-UP BOTTOM SHEETS */
   .sheet-bg {
     position: absolute; inset: 0; background: rgba(20,20,19,0);
@@ -392,6 +410,15 @@
       </div>
 
       <div>
+        <div class="slide-track" id="slideDismissTrack" style="display:none;">
+          <span class="slide-label" id="slideDismissLabel"></span>
+          <div class="slide-knob" id="slideDismissKnob">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+        </div>
         <button class="btn-verify" id="mainActionBtn" onclick="handleVerifyStep()"></button>
         <label class="btn-verify" id="nativeCamLabel" for="verifyFileInput" style="display:none;"></label>
         <input class="hidden-file" id="verifyFileInput" type="file" accept="image/*" capture="environment" onchange="onVerifyPhoto(event)" />
@@ -529,8 +556,8 @@
       lblRepeat: "반복 요일 · 날짜", dayShort: ["일","월","화","수","목","금","토"],
       alertPickDay: "요일을 최소 1개 선택하거나 달력에서 날짜를 지정해 주세요.",
       lblMode: "알람 방식", modePhoto: "장소 사진 인증", modeNormal: "일반 알람",
-      normalPlace: "일반 알람", normalBadge: "일반", stopNormal: "알람 끄기",
-      normalRule: s => `소리: ${s} · 터치로 바로 끄기`
+      normalPlace: "일반 알람", normalBadge: "일반", stopNormal: "밀어서 알람 끄기",
+      normalRule: s => `소리: ${s} · 가로로 밀어서 끄기`
     },
     en: {
       langBtn: "KR",
@@ -567,8 +594,8 @@
       lblRepeat: "REPEAT · DATE", dayShort: ["S","M","T","W","T","F","S"],
       alertPickDay: "Please select at least one day or pick a date.",
       lblMode: "ALARM MODE", modePhoto: "Photo Verify", modeNormal: "Standard",
-      normalPlace: "Standard Alarm", normalBadge: "STANDARD", stopNormal: "Dismiss Alarm",
-      normalRule: s => `Sound: ${s} · Tap to dismiss`
+      normalPlace: "Standard Alarm", normalBadge: "STANDARD", stopNormal: "Slide to Dismiss",
+      normalRule: s => `Sound: ${s} · Slide to dismiss`
     }
   };
 
@@ -998,8 +1025,21 @@
     document.getElementById("ringRule").textContent = isNormal ? t.normalRule(getSoundLabel(currentAlarm.soundKey)) : t.ruleFmt(getSoundLabel(currentAlarm.soundKey));
     document.getElementById("ringInfo").style.display = "block";
     document.getElementById("camView").classList.remove("show");
-    document.getElementById("mainActionBtn").style.display = "block";
-    document.getElementById("mainActionBtn").textContent = isNormal ? t.stopNormal : t.openCam;
+    const track = document.getElementById("slideDismissTrack");
+    const knob = document.getElementById("slideDismissKnob");
+    const lbl = document.getElementById("slideDismissLabel");
+    if (isNormal) {
+      document.getElementById("mainActionBtn").style.display = "none";
+      track.style.display = "flex";
+      lbl.textContent = t.stopNormal;
+      lbl.style.opacity = "1";
+      knob.classList.remove("dragging");
+      knob.style.transform = "translateX(0px)";
+    } else {
+      track.style.display = "none";
+      document.getElementById("mainActionBtn").style.display = "block";
+      document.getElementById("mainActionBtn").textContent = t.openCam;
+    }
     document.getElementById("nativeCamLabel").style.display = "none";
     document.getElementById("liveShotImg").style.display = "none";
     document.getElementById("liveVideo").style.display = "none";
@@ -1009,6 +1049,45 @@
     document.getElementById("ringOverlay").classList.add("show");
     startSiren(currentAlarm.soundKey);
   }
+
+  (function initSlideDismiss() {
+    const track = document.getElementById("slideDismissTrack");
+    const knob = document.getElementById("slideDismissKnob");
+    const lbl = document.getElementById("slideDismissLabel");
+    if (!track || !knob) return;
+    let dragging = false, startX = 0, curX = 0, maxX = 0;
+    knob.addEventListener("pointerdown", e => {
+      dragging = true;
+      startX = e.clientX;
+      maxX = Math.max(1, track.clientWidth - knob.offsetWidth - 10);
+      curX = 0;
+      knob.classList.add("dragging");
+      knob.setPointerCapture(e.pointerId);
+    });
+    knob.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      curX = Math.min(maxX, Math.max(0, e.clientX - startX));
+      knob.style.transform = `translateX(${curX}px)`;
+      lbl.style.opacity = String(Math.max(0, 1 - (curX / maxX) * 1.4));
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      knob.classList.remove("dragging");
+      if (curX >= maxX * 0.8) {
+        knob.style.transform = `translateX(${maxX}px)`;
+        setTimeout(() => {
+          stopSiren();
+          document.getElementById("ringOverlay").classList.remove("show");
+        }, 120);
+      } else {
+        knob.style.transform = "translateX(0px)";
+        lbl.style.opacity = "1";
+      }
+    }
+    knob.addEventListener("pointerup", endDrag);
+    knob.addEventListener("pointercancel", endDrag);
+  })();
 
   async function handleVerifyStep() {
     if (currentAlarm && currentAlarm.mode === "normal") {
